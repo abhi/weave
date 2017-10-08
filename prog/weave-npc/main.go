@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -56,15 +57,24 @@ func resetIPTables(ipt *iptables.IPTables) error {
 		return err
 	}
 
-	// XXX remove when upgrading
-	//if err := ipt.ClearChain(npc.TableFilter, npc.DefaultChain); err != nil {
-	//	return err
-	//}
-	//if err :=  ipt.DeleteChain(npc.TableFilter, npc.DefaultChain); err != nil {
-	//  return err
-	//}
+	if err := ipt.ClearChain(npc.TableFilter, npc.MainChain); err != nil {
+		return err
+	}
 
-	return ipt.ClearChain(npc.TableFilter, npc.MainChain)
+	// The following are for removing obsolete (pre-networkingv1) chains and rules
+	// to ensure smooth upgrading of weave-npc
+	if err := ipt.ClearChain(npc.TableFilter, npc.DefaultChain); err != nil {
+		return err
+	}
+	if err := ipt.DeleteChain(npc.TableFilter, npc.DefaultChain); err != nil {
+		return err
+	}
+	// The rules might not exist, so ignore errors. Also, assume a default weave
+	// bridge name.
+	ipt.Delete("filter", "FORWARD", "-o", net.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86")
+	ipt.Delete("filter", "FORWARD", "-o", net.WeaveBridgeName, "-j", "DROP")
+
+	return nil
 }
 
 func resetIPSets(ips ipset.Interface) error {

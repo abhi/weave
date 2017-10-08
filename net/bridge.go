@@ -443,14 +443,6 @@ func configureIPTables(config *BridgeConfig) error {
 		if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "WEAVE-NPC"); err != nil {
 			return err
 		}
-		// TODO(brb) delete when upgrading (from npc/main.go)
-		//if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-m", "state", "--state", "NEW", "-j", "NFLOG", "--nflog-group", "86"); err != nil {
-		//	return err
-		//}
-		// TODO(brb) delete when upgrading (from npc/main.go)
-		//if err = ipt.AppendUnique("filter", "FORWARD", "-o", config.WeaveBridgeName, "-j", "DROP"); err != nil {
-		//	return err
-		//}
 	} else {
 		// Work around the situation where there are no rules allowing traffic
 		// across our bridge. E.g. ufw
