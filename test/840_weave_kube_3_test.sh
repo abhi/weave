@@ -47,6 +47,7 @@ fi
 # Ensure Kubernetes uses locally built container images and inject code coverage environment variable (or do nothing depending on $COVERAGE):
 sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never%" \
     -e "s%env:%$COVERAGE_ARGS%" \
+    -e "s%#npc-args%              args:\n                - '--use-legacy-netpol'%" \
     "$(dirname "$0")/../prog/weave-kube/weave-daemonset-k8s-1.7.yaml" | run_on "$HOST1" "$KUBECTL apply -n kube-system -f -"
 
 sleep 5
@@ -144,6 +145,14 @@ check_all_pods_communicate() {
     return 1
 }
 
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker logs $(docker ps  -a | grep npc | awk '{print $1}' | head -n1) || true"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "sudo iptables-save"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
 # Check that a pod can contact the outside world
@@ -151,6 +160,14 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
 # Check that our pods haven't crashed
 assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
+
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "docker logs $(docker ps  -a | grep npc | awk '{print $1}' | head -n1) || true"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "sudo iptables-save"
+echo ">>>>>>>>>>>>>>>>>>>>>"
+run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
+echo ">>>>>>>>>>>>>>>>>>>>>"
 
 tear_down_kubeadm
 
