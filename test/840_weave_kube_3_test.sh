@@ -138,6 +138,7 @@ podName=$($SSH $HOST1 "$KUBECTL get pods -l run=nettest -o go-template='{{(index
 check_all_pods_communicate() {
     if [ -n podIP ] ; then
         status=$($SSH $HOST1 "$KUBECTL exec $podName -- curl -s -S http://127.0.0.1:8080/status")
+        echo "damn: $status"
         if [ $status = "pass" ] ; then
             return 0
         fi
@@ -145,13 +146,20 @@ check_all_pods_communicate() {
     return 1
 }
 
-echo ">>>>>>>>>>>>>>>>>>>>>"
-run_on $HOST1 "docker logs $(docker ps  -a | grep npc | awk '{print $1}' | head -n1) || true"
+sleep 60
+
+echo "BAR >>>>>>>>>>>>>>>>>>>>>"
+CID=$(docker -H tcp://$HOST1:$DOCKER_PORT ps -a --no-trunc | grep npc | awk '{print $1}' | head -n1)
+docker_on $HOST1 logs $CID
 echo ">>>>>>>>>>>>>>>>>>>>>"
 run_on $HOST1 "sudo iptables-save"
 echo ">>>>>>>>>>>>>>>>>>>>>"
 run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
-echo ">>>>>>>>>>>>>>>>>>>>>"
+$SSH $HOST1 "$KUBECTL get pods -n=kube-system" # check kube-dns restart count
+echo "EOF >>>>>>>>>>>>>>>>>>>>>"
+
+echo "Sleeping..."
+sleep 60
 
 assert_raises 'wait_for_x check_all_pods_communicate pods'
 
@@ -160,14 +168,6 @@ assert_raises "$SSH $HOST1 $KUBECTL exec $podName -- $PING 8.8.8.8"
 
 # Check that our pods haven't crashed
 assert "$SSH $HOST1 $KUBECTL get pods -n kube-system -l name=weave-net | grep -c Running" 3
-
-echo ">>>>>>>>>>>>>>>>>>>>>"
-run_on $HOST1 "docker logs $(docker ps  -a | grep npc | awk '{print $1}' | head -n1) || true"
-echo ">>>>>>>>>>>>>>>>>>>>>"
-run_on $HOST1 "sudo iptables-save"
-echo ">>>>>>>>>>>>>>>>>>>>>"
-run_on $HOST1 "$KUBECTL describe ds weave-net -n=kube-system"
-echo ">>>>>>>>>>>>>>>>>>>>>"
 
 tear_down_kubeadm
 
